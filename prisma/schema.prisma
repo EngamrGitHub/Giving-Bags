@@ -1,0 +1,81 @@
+// Prisma schema — نظام إدارة وتوزيع الشنط والمساعدات لـ مؤسسة اللواء
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// المستخدمون (Admin / Staff)
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  password    String       // مشفّرة بـ bcrypt
+  name        String
+  role        String       @default("STAFF") // "ADMIN" أو "STAFF"
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  redemptions Redemption[]
+}
+
+/// العائلة: مجموعة أفراد برقم مميز وتحديد مخصصات (شنط / مبالغ مالية)
+model Family {
+  id            String        @id @default(cuid())
+  familyCode    String        @unique // كود عائلة فريد (مثل FAM-1001)
+  familyName    String        // اسم العائلة (مثل عائلة آل محمود)
+  bagsCount     Int           @default(1) // عدد الشنط المخصصة
+  cashAmount    Float         @default(0) // المبلغ المالي المخصص (إن وجد)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  beneficiaries Beneficiary[]
+  redemptions   Redemption[]
+
+  @@index([familyName])
+  @@index([familyCode])
+}
+
+/// المستفيد: فرد مسجل في النظام ينتمي لعائلة
+model Beneficiary {
+  id           String       @id @default(cuid())
+  fullName     String
+  age          Int
+  nationalId   String       @unique // رقم البطاقة
+  phone        String
+  address      String
+  barcode      String       @unique // الكود الفريد المطبوع على الكارت
+  notes        String?
+  isFamilyHead Boolean      @default(false) // هل هو رب/مسئول العائلة
+  isActive     Boolean      @default(true)
+  familyId     String?
+  family       Family?      @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  redemptions  Redemption[]
+
+  @@index([fullName])
+  @@index([phone])
+}
+
+/// سجل الاستلام: توثيق استلام الشنط والفلوس لكل مستفيد وعائلته لكل شهر
+model Redemption {
+  id            String      @id @default(cuid())
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  beneficiaryId String
+  familyId      String?
+  family        Family?     @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  month         Int         // 1-12
+  year          Int
+  bagsDelivered Int         @default(1)
+  cashDelivered Float       @default(0)
+  redeemedAt    DateTime    @default(now())
+  redeemedBy    String?     // اسم الموظف/المتطوع (اختياري)
+
+  @@unique([beneficiaryId, month, year])
+  @@index([month, year])
+}
