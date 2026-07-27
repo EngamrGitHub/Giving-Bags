@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bags-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: bags_dis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bags-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:password123@db:5432/bags_dis?schema=public"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "admin123"
+      JWT_SECRET: "super-secret-jwt-key-for-bags-distribution-app-2026"
+      NEXT_PUBLIC_ORG_NAME: "مؤسسة اللواء"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
