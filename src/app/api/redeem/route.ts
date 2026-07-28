@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "الباركود أو الكود مطلوب" }, { status: 400 });
   }
 
-  const { barcode, redeemedBy } = parsed.data;
+  const { barcode, redeemedBy, customBags, customCash } = parsed.data;
 
   // البحث بالباركود أو الرقم القومي أو كود العائلة
   const beneficiary = await prisma.beneficiary.findFirst({
@@ -83,8 +83,10 @@ export async function POST(request: NextRequest) {
 
 
 
-  const bagsCount = beneficiary.family?.bagsCount ?? 1;
-  const cashAmount = beneficiary.family?.cashAmount ?? 0;
+  const defaultBags = beneficiary.family?.bagsCount ?? 1;
+  const defaultCash = beneficiary.family?.cashAmount ?? 0;
+  const bagsCount = customBags !== undefined ? customBags : defaultBags;
+  const cashAmount = customCash !== undefined ? customCash : defaultCash;
   const staffName = redeemedBy || session.name || "مسؤول التوزيع";
 
   const redemption = await prisma.redemption.create({

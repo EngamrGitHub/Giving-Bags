@@ -37,6 +37,10 @@ export default async function CardsPage() {
                 familyName: b.family?.familyName,
                 familyCode: b.family?.familyCode,
                 isFamilyHead: b.isFamilyHead,
+                age: b.age,
+                phone: b.phone,
+                address: b.address,
+                documentsProvided: b.documentsProvided,
               }}
             />
           ))}

@@ -13,7 +13,7 @@ function getSecretKey() {
 
 export interface SessionPayload {
   userId: string;
-  email: string;
+  email: string | null;
   name: string;
   role: "ADMIN" | "STAFF";
   [key: string]: unknown;
@@ -26,7 +26,7 @@ export async function authenticateUser(identifier: string, password: string): Pr
   // 1. البحث في جدول المستخدمين في قاعدة البيانات
   const user = await prisma.user.findFirst({
     where: {
-      OR: [{ email: cleanId }, { email: identifier }],
+      OR: [{ email: cleanId }, { username: cleanId }],
     },
   });
 

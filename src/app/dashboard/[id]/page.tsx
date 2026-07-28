@@ -25,7 +25,7 @@ export default async function BeneficiaryDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
             {beneficiary.fullName}
@@ -38,7 +38,7 @@ export default async function BeneficiaryDetailPage({
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="card-surface space-y-3">
+        <div className="no-print card-surface space-y-3">
           <h2 className="font-semibold text-gray-900">بيانات المستفيد والعائلة</h2>
           <dl className="space-y-2 text-sm">
             {beneficiary.family && (
@@ -46,7 +46,7 @@ export default async function BeneficiaryDetailPage({
                 <dt className="text-gray-500">العائلة المسجل بها</dt>
                 <dd className="font-bold text-brand-700">
                   {beneficiary.family.familyName} [{beneficiary.family.familyCode}]
-                  {beneficiary.isFamilyHead && " 👑 (رب العائلة)"}
+                  {beneficiary.isFamilyHead && " (رب العائلة)"}
                 </dd>
               </div>
             )}
@@ -72,6 +72,16 @@ export default async function BeneficiaryDetailPage({
                 {beneficiary.barcode}
               </dd>
             </div>
+            <div className="flex justify-between border-t border-gray-100 pt-2">
+              <dt className="text-gray-500">الأوراق المطلوبة</dt>
+              <dd className="font-medium text-gray-900">
+                {beneficiary.documentsProvided ? (
+                  <span className="text-green-600 font-bold">✅ نعم (تم تقديم الأوراق)</span>
+                ) : (
+                  <span className="text-red-600 font-bold">❌ لا (لم يقدّم الأوراق بعد)</span>
+                )}
+              </dd>
+            </div>
             {beneficiary.notes && (
               <div className="border-t border-gray-100 pt-2">
                 <dt className="mb-1 text-gray-500">ملاحظات</dt>
@@ -90,25 +100,43 @@ export default async function BeneficiaryDetailPage({
               familyName: beneficiary.family?.familyName,
               familyCode: beneficiary.family?.familyCode,
               isFamilyHead: beneficiary.isFamilyHead,
+              age: beneficiary.age,
+              phone: beneficiary.phone,
+              address: beneficiary.address,
+              documentsProvided: beneficiary.documentsProvided,
             }}
           />
         </div>
       </div>
 
       <div className="card-surface no-print">
-        <h2 className="mb-3 font-semibold text-gray-900">سجل استلام الشنط</h2>
+        <h2 className="mb-4 font-semibold text-gray-900">سجل استلام الشنط</h2>
         {beneficiary.redemptions.length === 0 ? (
           <p className="text-sm text-gray-400">لا يوجد سجل استلام حتى الآن</p>
         ) : (
-          <ul className="divide-y divide-gray-50 text-sm">
+          <ul className="divide-y divide-gray-100 text-sm">
             {beneficiary.redemptions.map((r) => (
-              <li key={r.id} className="flex items-center justify-between py-2">
-                <span className="font-medium text-gray-800">
-                  {ARABIC_MONTHS[r.month - 1]} {r.year}
-                </span>
-                <span className="text-gray-500">
-                  {new Date(r.redeemedAt).toLocaleString("ar-EG")}
-                </span>
+              <li key={r.id} className="py-3">
+                {/* Row 1: month + date */}
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900">
+                    {ARABIC_MONTHS[r.month - 1]} {r.year}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(r.redeemedAt).toLocaleString("ar-EG")}
+                  </span>
+                </div>
+                {/* Row 2: bags + cash + staff */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-700">
+                    🛍️ {r.bagsDelivered} شنطة
+                  </span>
+                  {r.cashDelivered > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                      💵 {r.cashDelivered} ج.م
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

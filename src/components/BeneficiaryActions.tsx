@@ -42,7 +42,7 @@ export default function BeneficiaryActions({
   return (
     <div className="no-print flex flex-wrap gap-2">
       <button onClick={() => window.print()} className="btn-primary">
-        🖨️ طباعة الكارت
+        🖨️ طباعة الكارت (85 × 54 مم)
       </button>
       <Link href={`/dashboard/${id}/edit`} className="btn-secondary">
         ✏️ تعديل البيانات

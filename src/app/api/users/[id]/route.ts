@@ -6,9 +6,32 @@ import { z } from "zod";
 
 const updateUserSchema = z.object({
   name: z.string().min(2, "الاسم مطلوب"),
-  email: z.string().email("بريد إلكتروني غير صحيح"),
+  email: z.string().email("بريد إلكتروني غير صحيح").optional(),
+  username: z
+    .string()
+    .min(3, "اسم المستخدم مطلوب (3 حروف على الأقل)")
+    .regex(/^[a-zA-Z0-9_]+$/, "اسم المستخدم يجب أن يحتوي على حروف إنجليزية وأرقام و _ فقط")
+    .optional(),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل").optional().or(z.literal("")),
   role: z.enum(["ADMIN", "STAFF"]),
+}).superRefine((data, ctx) => {
+  if (data.role === "ADMIN") {
+    if (!data.email) {
+      ctx.addIssue({
+        path: ["email"],
+        code: z.ZodIssueCode.custom,
+        message: "البريد الإلكتروني مطلوب لحساب المدير",
+      });
+    }
+  } else {
+    if (!data.username) {
+      ctx.addIssue({
+        path: ["username"],
+        code: z.ZodIssueCode.custom,
+        message: "اسم المستخدم مطلوب لحساب الموظف",
+      });
+    }
+  }
 });
 
 /** PUT /api/users/[id] — تعديل بيانات المستخدم (Admin فقط) */
@@ -30,25 +53,45 @@ export async function PUT(
     return NextResponse.json({ error: errorMsg }, { status: 400 });
   }
 
-  const { name, email, password, role } = parsed.data;
-  const cleanEmail = email.toLowerCase().trim();
+  const { name, email, username, password, role } = parsed.data;
+  const cleanEmail = email?.trim() ? email.toLowerCase().trim() : undefined;
+  const cleanUsername = username?.trim() ? username.trim().toLowerCase() : undefined;
 
-  // فحص البريد الإلكتروني مع حسابات أخرى
   const clash = await prisma.user.findFirst({
-    where: { email: cleanEmail, NOT: { id } },
+    where: {
+      OR: [
+        ...(cleanEmail ? [{ email: cleanEmail }] : []),
+        ...(cleanUsername ? [{ username: cleanUsername }] : []),
+      ],
+      NOT: { id },
+    },
   });
   if (clash) {
     return NextResponse.json(
-      { error: "البريد الإلكتروني مستخدم لحساب آخر بالفعل" },
+      { error: "البريد الإلكتروني أو اسم المستخدم مستخدم لحساب آخر بالفعل" },
       { status: 409 }
     );
   }
 
-  const updateData: { name: string; email: string; role: string; password?: string } = {
+  const updateData: {
+    name: string;
+    role: string;
+    email?: string | null;
+    username?: string | null;
+    password?: string;
+  } = {
     name,
-    email: cleanEmail,
     role,
   };
+
+  if (cleanEmail !== undefined) {
+    updateData.email = cleanEmail;
+  }
+
+  if (cleanUsername !== undefined) {
+    updateData.username = cleanUsername;
+  }
+
 
   if (password && password.trim().length >= 6) {
     updateData.password = await bcrypt.hash(password.trim(), 10);

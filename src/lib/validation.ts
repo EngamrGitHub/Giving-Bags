@@ -29,10 +29,11 @@ export const beneficiarySchema = z.object({
   notes: z.string().trim().max(500).optional().or(z.literal("")),
   familyId: z.string().optional().nullable(),
   isFamilyHead: z.boolean().default(false),
+  documentsProvided: z.boolean().default(false),
   barcode: z
     .string()
     .trim()
-    .regex(/^BAG-[A-Z0-9]{6,20}$/)
+    .regex(/^USER-[0-9]{5}$/)
     .optional(),
 });
 
@@ -46,4 +47,6 @@ export const loginSchema = z.object({
 export const redeemSchema = z.object({
   barcode: z.string().trim().min(1, "الباركود مطلوب"),
   redeemedBy: z.string().trim().max(100).optional().or(z.literal("")),
+  customBags: z.coerce.number().min(0).optional(),
+  customCash: z.coerce.number().min(0).optional(),
 });

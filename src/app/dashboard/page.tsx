@@ -18,6 +18,10 @@ interface BeneficiaryListItem {
   barcode: string;
   isActive: boolean;
   redeemedThisMonth: boolean;
+  family?: {
+    familyCode: string;
+    familyName: string;
+  } | null;
 }
 
 interface ListResponse {
@@ -32,6 +36,7 @@ const PAGE_SIZE = 5;
 export default function DashboardPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | "redeemed" | "not_redeemed">("all");
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [usingCache, setUsingCache] = useState(false);
@@ -40,7 +45,7 @@ export default function DashboardPage() {
   const loadFromCache = useCallback(async () => {
     const all = await getCachedBeneficiaries();
     const q = query.trim().toLowerCase();
-    const filtered = q
+    let filtered = q
       ? all.filter(
           (b) =>
             b.fullName.toLowerCase().includes(q) ||
@@ -49,6 +54,12 @@ export default function DashboardPage() {
             b.barcode.toLowerCase().includes(q)
         )
       : all;
+
+    if (statusFilter === "redeemed") {
+      filtered = filtered.filter((b) => b.redeemedThisMonth);
+    } else if (statusFilter === "not_redeemed") {
+      filtered = filtered.filter((b) => !b.redeemedThisMonth);
+    }
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const start = (page - 1) * PAGE_SIZE;
@@ -63,6 +74,7 @@ export default function DashboardPage() {
         barcode: b.barcode,
         isActive: b.isActive,
         redeemedThisMonth: b.redeemedThisMonth,
+        family: b.family,
       }));
 
     setData({
@@ -72,7 +84,7 @@ export default function DashboardPage() {
       totalPages,
     });
     setUsingCache(true);
-  }, [query, page]);
+  }, [query, page, statusFilter]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -81,6 +93,7 @@ export default function DashboardPage() {
         query,
         page: String(page),
         pageSize: String(PAGE_SIZE),
+        status: statusFilter,
       });
       const res = await fetch(`/api/beneficiaries?${params.toString()}`, {
         headers: { "x-client-date": new Date().toISOString() },
@@ -96,7 +109,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, page, loadFromCache]);
+  }, [query, page, statusFilter, loadFromCache]);
 
   useEffect(() => {
     fetchData();
@@ -115,6 +128,11 @@ export default function DashboardPage() {
     setPage(1);
   }
 
+  function handleStatusFilterChange(value: "all" | "redeemed" | "not_redeemed") {
+    setStatusFilter(value);
+    setPage(1);
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -126,9 +144,6 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/cards" className="btn-secondary">
-            🖨️ طباعة كل الكروت
-          </Link>
           <Link href="/dashboard/new" className="btn-primary">
             ➕ إضافة مستفيد
           </Link>
@@ -156,7 +171,7 @@ export default function DashboardPage() {
                       : "text-amber-600"
                   }
                 >
-                  {p.status === "pending" && "⏳ بانتظار المزامنة"}
+                  {p.status === "pending" && "بانتظار المزامنة"}
                   {p.status === "conflict" && "⚠️ تعارض"}
                   {p.status === "error" && "⚠️ خطأ في المزامنة"}
                 </span>
@@ -166,13 +181,22 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-3 items-center">
         <input
-          className="input-field max-w-md"
+          className="input-field max-w-md flex-1 min-w-[280px]"
           placeholder="ابحث بالاسم، الرقم القومي، الموبايل، أو الباركود..."
           value={query}
           onChange={(e) => handleSearchChange(e.target.value)}
         />
+        <select
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          value={statusFilter}
+          onChange={(e) => handleStatusFilterChange(e.target.value as any)}
+        >
+          <option value="all">كل الحالات</option>
+          <option value="redeemed">✅ تم الاستلام</option>
+          <option value="not_redeemed">لم يستلم بعد</option>
+        </select>
       </div>
 
       <div className="card-surface overflow-x-auto p-0">
@@ -183,6 +207,7 @@ export default function DashboardPage() {
               <th className="px-4 py-3 font-medium">السن</th>
               <th className="px-4 py-3 font-medium">الرقم القومي</th>
               <th className="px-4 py-3 font-medium">الموبايل</th>
+              <th className="px-4 py-3 font-medium">العائلة</th>
               <th className="px-4 py-3 font-medium">حالة الشهر الحالي</th>
               <th className="px-4 py-3 font-medium">إجراءات</th>
             </tr>
@@ -190,14 +215,14 @@ export default function DashboardPage() {
           <tbody className="divide-y divide-gray-50">
             {loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   جاري التحميل...
                 </td>
               </tr>
             )}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   لا يوجد مستفيدون مطابقون
                 </td>
               </tr>
@@ -215,6 +240,9 @@ export default function DashboardPage() {
                   <td className="px-4 py-3 text-gray-600" dir="ltr">
                     {b.phone}
                   </td>
+                  <td className="px-4 py-3 text-gray-600 font-bold text-brand-700">
+                    {b.family ? `${b.family.familyName} [${b.family.familyCode}]` : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     {b.redeemedThisMonth ? (
                       <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
@@ -222,7 +250,7 @@ export default function DashboardPage() {
                       </span>
                     ) : (
                       <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                        ⏳ لم يستلم بعد
+                        لم يستلم بعد
                       </span>
                     )}
                   </td>
@@ -231,7 +259,7 @@ export default function DashboardPage() {
                       href={`/dashboard/${b.id}`}
                       className="text-sm font-medium text-brand-700 hover:underline"
                     >
-                      عرض الكارت
+                      عرض البيانات
                     </Link>
                   </td>
                 </tr>

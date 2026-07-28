@@ -42,6 +42,10 @@ export interface CachedBeneficiary {
   isActive: boolean;
   redeemedThisMonth: boolean;
   redeemedMonthKey: string; // "2026-7" مثلا، عشان نعرف الكاش ده لأي شهر
+  family?: {
+    familyCode: string;
+    familyName: string;
+  } | null;
 }
 
 interface OfflineDBSchema extends DBSchema {

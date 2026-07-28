@@ -20,52 +20,68 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query")?.trim() || "";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const pageSize = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get("pageSize")) || 20)
+  );
 
   const clientDateHeader = request.headers.get("x-client-date");
   const now = clientDateHeader ? new Date(clientDateHeader) : new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
-  const families = await prisma.family.findMany({
-    where: query
-      ? {
-          OR: [
-            { familyName: { contains: query } },
-            { familyCode: { contains: query } },
-          ],
-        }
-      : {},
-    orderBy: { createdAt: "desc" },
-    include: {
-      beneficiaries: {
-        select: {
-          id: true,
-          fullName: true,
-          nationalId: true,
-          phone: true,
-          barcode: true,
-          isFamilyHead: true,
+  const where = query
+    ? {
+        OR: [
+          { familyName: { contains: query } },
+          { familyCode: { contains: query } },
+        ],
+      }
+    : {};
+
+  const [items, total] = await Promise.all([
+    prisma.family.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        beneficiaries: {
+          select: {
+            id: true,
+            fullName: true,
+            nationalId: true,
+            phone: true,
+            barcode: true,
+            isFamilyHead: true,
+          },
         },
-      },
-      redemptions: {
-        where: { month, year },
-        take: 1,
-        include: {
-          beneficiary: {
-            select: { fullName: true },
+        redemptions: {
+          where: { month, year },
+          take: 1,
+          include: {
+            beneficiary: {
+              select: { fullName: true },
+            },
           },
         },
       },
-    },
-  });
+    }),
+    prisma.family.count({ where }),
+  ]);
 
   return NextResponse.json({
-    families: families.map((f) => ({
+    families: items.map((f) => ({
       ...f,
       redeemedThisMonth: f.redemptions.length > 0,
       redeemedByMember: f.redemptions[0]?.beneficiary?.fullName || null,
       redeemedAt: f.redemptions[0]?.redeemedAt || null,
     })),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
   });
 }
 

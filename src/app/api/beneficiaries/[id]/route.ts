@@ -66,10 +66,29 @@ export async function PUT(request: NextRequest, { params }: Params) {
         notes: data.notes || null,
         familyId: data.familyId || null,
         isFamilyHead: data.isFamilyHead || false,
+        documentsProvided: data.documentsProvided ?? false,
       },
       include: {
         family: true,
       },
+    });
+    return NextResponse.json({ item: beneficiary });
+  } catch {
+    return NextResponse.json({ error: "المستفيد غير موجود" }, { status: 404 });
+  }
+}
+
+/** PATCH /api/beneficiaries/[id] — إزالة المستفيد من عائلته */
+export async function PATCH(_request: NextRequest, { params }: Params) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+  }
+
+  try {
+    const beneficiary = await prisma.beneficiary.update({
+      where: { id: params.id },
+      data: { familyId: null, isFamilyHead: false },
     });
     return NextResponse.json({ item: beneficiary });
   } catch {

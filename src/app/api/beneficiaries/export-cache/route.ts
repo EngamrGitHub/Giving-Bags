@@ -29,6 +29,12 @@ export async function GET(request: NextRequest) {
       address: true,
       barcode: true,
       isActive: true,
+      family: {
+        select: {
+          familyCode: true,
+          familyName: true,
+        },
+      },
       redemptions: {
         where: { month, year },
         select: { id: true },
@@ -52,6 +58,10 @@ export async function GET(request: NextRequest) {
       isActive: b.isActive,
       redeemedThisMonth: b.redemptions.length > 0,
       redeemedMonthKey: monthKey,
+      family: b.family ? {
+        familyCode: b.family.familyCode,
+        familyName: b.family.familyName,
+      } : null,
     })),
   });
 }

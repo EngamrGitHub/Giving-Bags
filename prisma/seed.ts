@@ -16,7 +16,7 @@ async function main() {
   // فحص بالبريد الإيميل أو الاسم
   let existingAdmin = await prisma.user.findFirst({
     where: {
-      OR: [{ email: adminEmail }, { email: adminUsername }],
+      OR: [{ email: adminEmail }, { username: adminUsername }],
     },
   });
 
@@ -25,6 +25,7 @@ async function main() {
     existingAdmin = await prisma.user.create({
       data: {
         email: adminEmail,
+        username: adminUsername,
         password: hashedPassword,
         name: "مدير النظام (Admin)",
         role: "ADMIN",
@@ -34,16 +35,21 @@ async function main() {
   }
 
   // 2. إنشاء عائلات تجريبية
+  const code1 = `FAM-${Math.floor(10000 + Math.random() * 90000)}`;
+  const code2 = `FAM-${Math.floor(10000 + Math.random() * 90000)}`;
+
   const sampleFamilies = [
     {
-      familyCode: "FAM-1001",
+      key: "FAM-1001",
+      familyCode: code1,
       familyName: "عائلة آل عبد الله",
       bagsCount: 2,
       cashAmount: 500,
       notes: "عائلة مكونة من 5 أفراد",
     },
     {
-      familyCode: "FAM-1002",
+      key: "FAM-1002",
+      familyCode: code2,
       familyName: "عائلة آل السيد",
       bagsCount: 1,
       cashAmount: 300,
@@ -57,9 +63,10 @@ async function main() {
       where: { familyCode: f.familyCode },
     });
     if (!fam) {
-      fam = await prisma.family.create({ data: f });
+      const { key, ...data } = f;
+      fam = await prisma.family.create({ data });
     }
-    createdFamilies[f.familyCode] = fam.id;
+    createdFamilies[f.key] = fam.id;
   }
 
   // 3. إضافة مستفيدين وربطهم بالعائلات
@@ -93,14 +100,26 @@ async function main() {
     },
   ];
 
+  const usedBarcodes = new Set<string>();
   for (const person of sampleBeneficiaries) {
     const existing = await prisma.beneficiary.findUnique({
       where: { nationalId: person.nationalId },
     });
     if (existing) continue;
 
+    let barcode = "";
+    while (true) {
+      const digits = Math.floor(10000 + Math.random() * 90000);
+      const candidate = `USER-${digits}`;
+      if (!usedBarcodes.has(candidate)) {
+        barcode = candidate;
+        usedBarcodes.add(candidate);
+        break;
+      }
+    }
+
     await prisma.beneficiary.create({
-      data: { ...person, barcode: `BAG-${nanoid()}` },
+      data: { ...person, barcode },
     });
   }
 

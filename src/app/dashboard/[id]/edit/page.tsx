@@ -31,6 +31,7 @@ export default async function EditBeneficiaryPage({
           notes: beneficiary.notes ?? "",
           familyId: beneficiary.familyId ?? "",
           isFamilyHead: beneficiary.isFamilyHead ?? false,
+          documentsProvided: beneficiary.documentsProvided ?? false,
         }}
       />
     </div>

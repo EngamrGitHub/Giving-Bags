@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 interface BeneficiaryMember {
@@ -31,6 +32,9 @@ export default function FamiliesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingFamily, setEditingFamily] = useState<FamilyItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Form states
   const [familyCode, setFamilyCode] = useState("");
@@ -39,14 +43,16 @@ export default function FamiliesPage() {
   const [cashAmount, setCashAmount] = useState(0);
   const [notes, setNotes] = useState("");
 
-  async function fetchFamilies(query = "") {
+  async function fetchFamilies(query = "", currentPage = page) {
+    setLoading(true);
     try {
-      const res = await fetch(`/api/families?query=${encodeURIComponent(query)}`, {
+      const res = await fetch(`/api/families?query=${encodeURIComponent(query)}&page=${currentPage}&pageSize=5`, {
         headers: { "x-client-date": new Date().toISOString() },
       });
       const data = await res.json();
       if (res.ok) {
         setFamilies(data.families || []);
+        setTotalPages(data.totalPages || 1);
       } else {
         toast.error(data.error || "فشل جلب العائلات");
       }
@@ -58,12 +64,12 @@ export default function FamiliesPage() {
   }
 
   useEffect(() => {
-    fetchFamilies();
-  }, []);
+    fetchFamilies(search, page);
+  }, [page]);
 
   function openCreateModal() {
     setEditingFamily(null);
-    setFamilyCode(`FAM-${Math.floor(1000 + Math.random() * 9000)}`);
+    setFamilyCode(`FAM-${Math.floor(10000 + Math.random() * 90000)}`);
     setFamilyName("");
     setBagsCount(1);
     setCashAmount(0);
@@ -102,12 +108,43 @@ export default function FamiliesPage() {
       } else {
         toast.success(editingFamily ? "تم تعديل بيانات العائلة" : "تمت إضافة العائلة بنجاح");
         setShowModal(false);
-        fetchFamilies(search);
+        fetchFamilies(search, page);
       }
     } catch {
       toast.error("حدث خطأ أثناء الاتصال");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function removeMember(memberId: string, memberName: string) {
+    if (!confirm(`هل تريد إزالة "${memberName}" من العائلة؟\n(سيظل مسجلاً في النظام بدون عائلة)`)) return;
+    setRemovingMemberId(memberId);
+    try {
+      const res = await fetch(`/api/beneficiaries/${memberId}`, { method: "PATCH" });
+      if (res.ok) {
+        toast.success(`تمت إزالة ${memberName} من العائلة`);
+        // تحديث البيانات في الـ state مباشرة
+        setEditingFamily((prev) =>
+          prev
+            ? { ...prev, beneficiaries: prev.beneficiaries.filter((b) => b.id !== memberId) }
+            : prev
+        );
+        setFamilies((prev) =>
+          prev.map((f) =>
+            f.id === editingFamily?.id
+              ? { ...f, beneficiaries: f.beneficiaries.filter((b) => b.id !== memberId) }
+              : f
+          )
+        );
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "فشل إزالة الفرد");
+      }
+    } catch {
+      toast.error("خطأ في الاتصال");
+    } finally {
+      setRemovingMemberId(null);
     }
   }
 
@@ -118,7 +155,7 @@ export default function FamiliesPage() {
       const res = await fetch(`/api/families/${f.id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("تم مسح العائلة");
-        fetchFamilies(search);
+        fetchFamilies(search, page);
       } else {
         toast.error("فشل مسح العائلة");
       }
@@ -149,7 +186,8 @@ export default function FamiliesPage() {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            fetchFamilies(e.target.value);
+            setPage(1);
+            fetchFamilies(e.target.value, 1);
           }}
           placeholder="ابحث باسم العائلة أو كود العائلة المميز..."
         />
@@ -233,6 +271,39 @@ export default function FamiliesPage() {
                 />
               </div>
 
+              {/* أفراد العائلة — يظهر فقط عند التعديل */}
+              {editingFamily && editingFamily.beneficiaries.length > 0 && (
+                <div>
+                  <label className="label-field mb-2 block">أفراد العائلة</label>
+                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                    {editingFamily.beneficiaries.map((b) => (
+                      <li key={b.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`inline-block shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                              b.isFamilyHead
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-brand-50 text-brand-700"
+                            }`}
+                          >
+                            {b.isFamilyHead ? "رب الأسرة" : "فرد"}
+                          </span>
+                          <span className="text-sm font-medium text-gray-800 truncate">{b.fullName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={removingMemberId === b.id}
+                          onClick={() => removeMember(b.id, b.fullName)}
+                          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          {removingMemberId === b.id ? "جاري الإزالة..." : "إزالة"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="mt-6 flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -258,91 +329,108 @@ export default function FamiliesPage() {
           لا توجد عائلات مسجلة حاليًا
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {families.map((f) => (
-            <div key={f.id} className="card-surface flex flex-col justify-between space-y-4">
-              <div>
-                <div className="flex items-start justify-between gap-2 border-b pb-3">
-                  <div>
-                    <span className="rounded bg-brand-50 px-2 py-0.5 font-mono text-xs font-bold text-brand-700">
-                      {f.familyCode}
-                    </span>
-                    <h3 className="mt-1 text-base font-bold text-gray-900">{f.familyName}</h3>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditModal(f)}
-                      className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-200"
-                    >
-                      تعديل
-                    </button>
-                    <button
-                      onClick={() => handleDelete(f)}
-                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
-                    >
-                      مسح
-                    </button>
-                  </div>
-                </div>
-
-                {/* المخصصات */}
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl bg-brand-50/70 p-2.5">
-                    <p className="text-xs text-brand-600 font-medium">عدد الشنط المخصصة</p>
-                    <p className="text-lg font-extrabold text-brand-800">{f.bagsCount} شنطة</p>
-                  </div>
-                  <div className="rounded-xl bg-emerald-50/70 p-2.5">
-                    <p className="text-xs text-emerald-600 font-medium">المبلغ المالي المخصص</p>
-                    <p className="text-lg font-extrabold text-emerald-800">{f.cashAmount} ج.م</p>
-                  </div>
-                </div>
-
-                {/* حالة الاستلام للشهر الحالي */}
-                <div className="mt-3">
-                  {f.redeemedThisMonth ? (
-                    <div className="rounded-xl bg-emerald-100/80 p-2.5 text-xs text-emerald-800">
-                      <strong>تم استلام مخصصات الشهر بواسطة:</strong> {f.redeemedByMember}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
-                      لم يتم استلام مخصصات هذا الشهر بعد
-                    </div>
-                  )}
-                </div>
-
-                {/* الأفراد التابعون للعائلة */}
-                <div className="mt-3 space-y-1">
-                  <p className="text-xs font-bold text-gray-500">
-                    الأفراد المسجلون برقم العائلة ({f.beneficiaries.length}):
-                  </p>
-                  {f.beneficiaries.length === 0 ? (
-                    <p className="text-xs text-gray-400">لا يوجد أفراد مسجلين لهذه العائلة بعد</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {f.beneficiaries.map((b) => (
-                        <span
-                          key={b.id}
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium ${b.isFamilyHead
-                            ? "bg-amber-100 text-amber-900 border border-amber-300 font-bold"
-                            : "bg-gray-100 text-gray-700"
-                            }`}
-                        >
-                          {b.fullName}
-                          {b.isFamilyHead && " (مسؤول العائلة)"}
+        <>
+          <div className="card-surface overflow-x-auto p-0">
+            <table className="w-full min-w-[800px] text-right text-sm">
+              <thead className="border-b border-gray-100 bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">كود العائلة</th>
+                  <th className="px-4 py-3 font-medium">اسم العائلة</th>
+                  <th className="px-4 py-3 font-medium text-center">عدد الشنط</th>
+                  <th className="px-4 py-3 font-medium text-center">المبلغ المالي</th>
+                  <th className="px-4 py-3 font-medium">حالة استلام الشهر</th>
+                  <th className="px-4 py-3 font-medium">أفراد العائلة</th>
+                  <th className="px-4 py-3 font-medium">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {families.map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50/60">
+                    <td className="px-4 py-3 font-mono font-bold text-gray-900">
+                      <span className="rounded bg-brand-50 px-2 py-0.5 text-xs text-brand-700">
+                        {f.familyCode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900">{f.familyName}</td>
+                    <td className="px-4 py-3 text-center font-bold text-brand-700">{f.bagsCount} شنطة</td>
+                    <td className="px-4 py-3 text-center font-bold text-emerald-700">{f.cashAmount} ج.م</td>
+                    <td className="px-4 py-3">
+                      {f.redeemedThisMonth ? (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                          ✅ تم الاستلام ({f.redeemedByMember})
                         </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                      ) : (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                          لم يستلم بعد
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 max-w-[240px]">
+                      {f.beneficiaries.length === 0 ? (
+                        <span className="text-gray-400 text-xs">لا يوجد أفراد بعد</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {f.beneficiaries.map((b) => (
+                            <Link
+                              key={b.id}
+                              href={`/dashboard/${b.id}`}
+                              className={`inline-block rounded px-1.5 py-0.5 text-[11px] transition-opacity hover:opacity-75 ${
+                                b.isFamilyHead
+                                  ? "bg-amber-50 text-amber-800 border border-amber-200 font-bold"
+                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}
+                            >
+                              {b.fullName}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEditModal(f)}
+                          className="text-sm font-medium text-brand-700 hover:underline"
+                        >
+                          تعديل
+                        </button>
+                        <button
+                          onClick={() => handleDelete(f)}
+                          className="text-sm font-medium text-red-600 hover:underline"
+                        >
+                          مسح
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-              {f.notes && (
-                <p className="border-t pt-2 text-xs text-gray-400">ملاحظات: {f.notes}</p>
-              )}
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button
+                className="btn-secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                السابق
+              </button>
+              <span className="text-sm text-gray-500">
+                صفحة {page} من {totalPages}
+              </span>
+              <button
+                className="btn-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                التالي
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

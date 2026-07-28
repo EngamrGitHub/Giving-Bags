@@ -12,7 +12,8 @@ datasource db {
 /// المستخدمون (Admin / Staff)
 model User {
   id          String       @id @default(cuid())
-  email       String       @unique
+  email       String?      @unique
+  username    String?      @unique
   password    String       // مشفّرة بـ bcrypt
   name        String
   role        String       @default("STAFF") // "ADMIN" أو "STAFF"
@@ -49,6 +50,7 @@ model Beneficiary {
   barcode      String       @unique // الكود الفريد المطبوع على الكارت
   notes        String?
   isFamilyHead Boolean      @default(false) // هل هو رب/مسئول العائلة
+  documentsProvided Boolean      @default(false)
   isActive     Boolean      @default(true)
   familyId     String?
   family       Family?      @relation(fields: [familyId], references: [id], onDelete: SetNull)

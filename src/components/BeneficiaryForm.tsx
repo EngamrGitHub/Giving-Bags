@@ -15,6 +15,7 @@ export interface BeneficiaryFormValues {
   notes: string;
   familyId?: string;
   isFamilyHead?: boolean;
+  documentsProvided?: boolean;
 }
 
 const emptyValues: BeneficiaryFormValues = {
@@ -26,6 +27,7 @@ const emptyValues: BeneficiaryFormValues = {
   notes: "",
   familyId: "",
   isFamilyHead: false,
+  documentsProvided: false,
 };
 
 interface BeneficiaryFormProps {
@@ -81,6 +83,7 @@ export default function BeneficiaryForm({
       notes: values.notes,
       familyId: values.familyId || null,
       isFamilyHead: values.isFamilyHead || false,
+      documentsProvided: values.documentsProvided || false,
     };
 
     // إضافة مستفيد جديد بدون إنترنت: نسجّله محليًا ونرجع نزامنه بعدين
@@ -234,6 +237,18 @@ export default function BeneficiaryForm({
               <span>هذا المستفيد هو (رب / مسئول العائلة)</span>
             </label>
           </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3.5 text-sm font-semibold text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+              checked={values.documentsProvided || false}
+              onChange={(e) => update("documentsProvided", e.target.checked)}
+            />
+            <span>تم تقديم الأوراق المطلوبة (البطاقة، القسيمة، إثبات الدخل... إلخ)</span>
+          </label>
         </div>
 
         <div className="sm:col-span-2">

@@ -56,7 +56,7 @@ export default function PendingBeneficiaryPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+      <div className="no-print rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
         📡 هذا المستفيد اتسجل محليًا على الجهاز ده ولسه ما اتزامنش مع السيرفر.
         {entry.status === "conflict" && (
           <p className="mt-1 text-red-700">⚠️ تعارض عند المزامنة: {entry.message}</p>
@@ -66,7 +66,7 @@ export default function PendingBeneficiaryPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
             {entry.payload.fullName}
@@ -77,7 +77,7 @@ export default function PendingBeneficiaryPage() {
         </div>
         <div className="no-print flex gap-2">
           <button onClick={() => window.print()} className="btn-primary">
-            🖨️ طباعة الكارت
+            🖨️ طباعة الكارت (85 × 54 مم)
           </button>
           <button onClick={handleDiscard} className="btn-danger">
             🗑️ حذف
@@ -86,7 +86,7 @@ export default function PendingBeneficiaryPage() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="card-surface space-y-2 text-sm">
+        <div className="no-print card-surface space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">السن</span>
             <span className="font-medium text-gray-900">
@@ -105,6 +105,16 @@ export default function PendingBeneficiaryPage() {
               {entry.payload.address}
             </span>
           </div>
+          <div className="flex justify-between border-t border-gray-100 pt-2">
+            <span className="text-gray-500">الأوراق المطلوبة</span>
+            <span className="font-medium text-gray-900">
+              {entry.payload.documentsProvided ? (
+                <span className="text-green-600 font-bold">✅ نعم (تم تقديم الأوراق)</span>
+              ) : (
+                <span className="text-red-600 font-bold">❌ لا (لم يقدّم الأوراق بعد)</span>
+              )}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center justify-center print-page">
@@ -113,6 +123,10 @@ export default function PendingBeneficiaryPage() {
               fullName: entry.payload.fullName,
               nationalId: entry.payload.nationalId,
               barcode: entry.localBarcode,
+              age: entry.payload.age,
+              phone: entry.payload.phone,
+              address: entry.payload.address,
+              documentsProvided: entry.payload.documentsProvided,
             }}
           />
         </div>

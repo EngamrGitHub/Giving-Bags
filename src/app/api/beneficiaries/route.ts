@@ -19,22 +19,33 @@ export async function GET(request: NextRequest) {
     100,
     Math.max(1, Number(searchParams.get("pageSize")) || 20)
   );
-
-  const where: Prisma.BeneficiaryWhereInput = query
-    ? {
-      OR: [
-        { fullName: { contains: query } },
-        { nationalId: { contains: query } },
-        { phone: { contains: query } },
-        { barcode: { contains: query } },
-      ],
-    }
-    : {};
+  const status = searchParams.get("status") || "all";
 
   const clientDateHeader = request.headers.get("x-client-date");
   const now = clientDateHeader ? new Date(clientDateHeader) : new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
+
+  const where: Prisma.BeneficiaryWhereInput = {};
+
+  if (query) {
+    where.OR = [
+      { fullName: { contains: query } },
+      { nationalId: { contains: query } },
+      { phone: { contains: query } },
+      { barcode: { contains: query } },
+    ];
+  }
+
+  if (status === "redeemed") {
+    where.redemptions = {
+      some: { month, year },
+    };
+  } else if (status === "not_redeemed") {
+    where.redemptions = {
+      none: { month, year },
+    };
+  }
 
   const [items, total] = await Promise.all([
     prisma.beneficiary.findMany({
@@ -131,6 +142,7 @@ export async function POST(request: NextRequest) {
       notes: data.notes || null,
       familyId: data.familyId || null,
       isFamilyHead: data.isFamilyHead || false,
+      documentsProvided: data.documentsProvided ?? false,
       barcode,
     },
     include: {
