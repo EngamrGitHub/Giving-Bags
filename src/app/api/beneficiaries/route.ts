@@ -47,42 +47,50 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  const [items, total] = await Promise.all([
-    prisma.beneficiary.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        family: {
-          select: {
-            id: true,
-            familyCode: true,
-            familyName: true,
-            bagsCount: true,
-            cashAmount: true,
+  try {
+    const [items, total] = await Promise.all([
+      prisma.beneficiary.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          family: {
+            select: {
+              id: true,
+              familyCode: true,
+              familyName: true,
+              bagsCount: true,
+              cashAmount: true,
+            },
+          },
+          redemptions: {
+            where: { month, year },
+            take: 1,
           },
         },
-        redemptions: {
-          where: { month, year },
-          take: 1,
-        },
-      },
-    }),
-    prisma.beneficiary.count({ where }),
-  ]);
+      }),
+      prisma.beneficiary.count({ where }),
+    ]);
 
-  return NextResponse.json({
-    items: items.map((b) => ({
-      ...b,
-      redeemedThisMonth: b.redemptions.length > 0,
-      redemptions: undefined,
-    })),
-    total,
-    page,
-    pageSize,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
-  });
+    return NextResponse.json({
+      items: items.map((b) => ({
+        ...b,
+        redeemedThisMonth: b.redemptions.length > 0,
+        redemptions: undefined,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    });
+  } catch (err: any) {
+    console.warn("DB query in GET /api/beneficiaries failed:", err);
+    return NextResponse.json(
+      { error: "تعذر الاتصال بقاعدة البيانات على السيرفر", offline: true },
+      { status: 500 }
+    );
+  }
 }
 
 /** POST /api/beneficiaries — إضافة مستفيد جديد */
@@ -102,56 +110,59 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
 
-  const existing = await prisma.beneficiary.findUnique({
-    where: { nationalId: data.nationalId },
-  });
-  if (existing) {
+  try {
+    const existing = await prisma.beneficiary.findUnique({
+      where: { nationalId: data.nationalId },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { error: "يوجد مستفيد مسجل بنفس الرقم القومي بالفعل" },
+        { status: 409 }
+      );
+    }
+
+    let barcode = data.barcode;
+    let barcodeChanged = false;
+    if (barcode) {
+      const clash = await prisma.beneficiary.findUnique({ where: { barcode } });
+      if (clash) {
+        barcode = undefined;
+        barcodeChanged = true;
+      }
+    }
+    if (!barcode) {
+      barcode = generateBarcodeValue();
+      for (let attempts = 0; attempts < 5; attempts++) {
+        const clash = await prisma.beneficiary.findUnique({ where: { barcode } });
+        if (!clash) break;
+        barcode = generateBarcodeValue();
+      }
+    }
+
+    const beneficiary = await prisma.beneficiary.create({
+      data: {
+        fullName: data.fullName,
+        age: data.age,
+        nationalId: data.nationalId,
+        phone: data.phone,
+        address: data.address || "غير مدون",
+        notes: data.notes || null,
+        familyId: data.familyId || null,
+        isFamilyHead: data.isFamilyHead || false,
+        documentsProvided: data.documentsProvided ?? false,
+        barcode,
+      },
+      include: {
+        family: true,
+      },
+    });
+
+    return NextResponse.json({ item: beneficiary, barcodeChanged }, { status: 201 });
+  } catch (err: any) {
+    console.warn("DB operation in POST /api/beneficiaries failed:", err);
     return NextResponse.json(
-      { error: "يوجد مستفيد مسجل بنفس الرقم القومي بالفعل" },
-      { status: 409 }
+      { error: "تعذر الاتصال بقاعدة البيانات على السيرفر للمزامنة" },
+      { status: 500 }
     );
   }
-
-  // لو الطلب جاي من مزامنة مستفيد اتضاف أوفلاين، نحافظ على نفس الباركود
-  // اللي كان متطبوع على الكارت أول ما اتضاف، طالما لسه متاح
-  let barcode = data.barcode;
-  let barcodeChanged = false;
-  if (barcode) {
-    const clash = await prisma.beneficiary.findUnique({ where: { barcode } });
-    if (clash) {
-      barcode = undefined;
-      barcodeChanged = true;
-    }
-  }
-  if (!barcode) {
-    barcode = generateBarcodeValue();
-    for (let attempts = 0; attempts < 5; attempts++) {
-      const clash = await prisma.beneficiary.findUnique({ where: { barcode } });
-      if (!clash) break;
-      barcode = generateBarcodeValue();
-    }
-  }
-
-  const beneficiary = await prisma.beneficiary.create({
-    data: {
-      fullName: data.fullName,
-      age: data.age,
-      nationalId: data.nationalId,
-      phone: data.phone,
-      address: data.address || "غير مدون",
-      notes: data.notes || null,
-      familyId: data.familyId || null,
-      isFamilyHead: data.isFamilyHead || false,
-      documentsProvided: data.documentsProvided ?? false,
-      barcode,
-    },
-    include: {
-      family: true,
-    },
-  });
-
-  return NextResponse.json(
-    { item: beneficiary, barcodeChanged },
-    { status: 201 }
-  );
 }
