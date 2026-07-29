@@ -1,0 +1,6 @@
+# Nixpacks Configuration for Coolify
+[cache]
+paths = [
+  "/app/.next/cache",
+  "/app/node_modules/.cache"
+]
