@@ -9,6 +9,8 @@ import {
   type PendingBeneficiary,
 } from "@/lib/offlineDb";
 
+import CameraScanner from "@/components/CameraScanner";
+
 interface BeneficiaryListItem {
   id: string;
   fullName: string;
@@ -41,6 +43,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [usingCache, setUsingCache] = useState(false);
   const [pending, setPending] = useState<PendingBeneficiary[]>([]);
+  const [showCamera, setShowCamera] = useState(false);
+
+  const handleCameraScan = (scannedCode: string) => {
+    toast.success(`تم قراءة الكود: ${scannedCode}`);
+    setQuery(scannedCode);
+    setPage(1);
+    setShowCamera(false);
+  };
 
   const loadFromCache = useCallback(async () => {
     const all = await getCachedBeneficiaries();
@@ -182,12 +192,32 @@ export default function DashboardPage() {
       )}
 
       <div className="mb-4 flex flex-wrap gap-3 items-center">
-        <input
-          className="input-field max-w-md flex-1 min-w-[280px]"
-          placeholder="ابحث بالاسم، الرقم القومي، الموبايل، أو الباركود..."
-          value={query}
-          onChange={(e) => handleSearchChange(e.target.value)}
-        />
+        <div className="relative flex-1 max-w-md min-w-[280px]">
+          <input
+            className="input-field w-full pl-8"
+            placeholder="ابحث بالاسم، الرقم القومي، الموبايل، أو الباركود..."
+            value={query}
+            onChange={(e) => handleSearchChange(e.target.value)}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => handleSearchChange("")}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowCamera((p) => !p)}
+          className="rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 flex items-center gap-1.5 transition"
+        >
+          📷 {showCamera ? "إغلاق الكاميرا" : "مسح QR للبحث"}
+        </button>
+
         <select
           className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
           value={statusFilter}
@@ -198,6 +228,12 @@ export default function DashboardPage() {
           <option value="not_redeemed">لم يستلم بعد</option>
         </select>
       </div>
+
+      {showCamera && (
+        <div className="mb-4 max-w-md">
+          <CameraScanner onScanSuccess={handleCameraScan} onClose={() => setShowCamera(false)} />
+        </div>
+      )}
 
       <div className="card-surface overflow-x-auto p-0">
         <table className="w-full min-w-[640px] text-right text-sm">

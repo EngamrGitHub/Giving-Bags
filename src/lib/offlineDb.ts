@@ -24,6 +24,9 @@ export interface PendingBeneficiary {
     phone: string;
     address: string;
     notes: string;
+    documentsProvided?: boolean;
+    familyId?: string;
+    isFamilyHead?: boolean;
   };
   localBarcode: string;
   createdAt: string;

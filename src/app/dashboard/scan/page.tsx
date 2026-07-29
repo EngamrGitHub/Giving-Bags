@@ -47,6 +47,22 @@ function currentMonthLabel() {
   return `${ARABIC_MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 }
 
+function playScanBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  } catch {}
+}
+
 /* ─── Page ───────────────────────────────────────────────── */
 export default function ScanPage() {
   // Scan input
@@ -74,6 +90,21 @@ export default function ScanPage() {
     if (step === "input") inputRef.current?.focus();
   }, [step]);
 
+  // Automatic refocus for physical barcode reader guns
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (step !== "input") return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")) {
+        return;
+      }
+      inputRef.current?.focus();
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [step]);
+
   /* ── Step 1: fetch preview ── */
   const fetchPreview = useCallback(async (code: string) => {
     const trimmed = code.trim();
@@ -94,18 +125,17 @@ export default function ScanPage() {
 
       if (!res.ok) {
         toast.error(data.error || "تعذر جلب البيانات");
-        setBarcode("");
         inputRef.current?.focus();
         return;
       }
 
+      playScanBeep();
       setPreview(data);
       setCustomBags(data.beneficiary.bagsCount);
       setCustomCash(data.beneficiary.cashAmount);
       setStep("preview");
     } catch {
       toast.error("لا يوجد اتصال بالإنترنت");
-      setBarcode("");
       inputRef.current?.focus();
     } finally {
       setLoadingPreview(false);
@@ -142,7 +172,6 @@ export default function ScanPage() {
       } finally {
         setLoadingSubmit(false);
         setStep("done");
-        setBarcode("");
       }
       return;
     }
@@ -183,7 +212,6 @@ export default function ScanPage() {
         toast.success(`✅ تم تسليم ${data.beneficiary.bagsDelivered} شنطة لـ ${data.beneficiary.fullName}`);
       }
       setStep("done");
-      setBarcode("");
     } catch {
       // Network error — show error and stay on preview so user can retry
       toast.error("حدث خطأ في الاتصال، تحقق من الإنترنت وحاول مرة أخرى");
@@ -246,7 +274,7 @@ export default function ScanPage() {
                 : "bg-brand-600 text-white hover:bg-brand-700"
             }`}
           >
-            {showCamera ? "إغلاق الكاميرا" : "📷 كاميرا"}
+            {showCamera ? "إغلاق الكاميرا" : "📷 كاميرا QR"}
           </button>
         </div>
       </div>
@@ -259,32 +287,46 @@ export default function ScanPage() {
       {/* ── STEP 1: Barcode Input ── */}
       <div className="card-surface space-y-4">
         <div>
-          <label className="label-field">كود الباركود / QR</label>
-          <input
-            ref={inputRef}
-            className={`input-field text-center text-lg tracking-widest font-mono transition-all ${
-              step === "preview" ? "bg-gray-50 text-gray-400" : ""
-            }`}
-            dir="ltr"
-            value={barcode}
-            onChange={(e) => {
-              setBarcode(e.target.value);
-              // If user edits barcode after preview, reset to input step
-              if (step !== "input") {
-                setStep("input");
-                setPreview(null);
-                setSubmitResult(null);
-              }
-            }}
-            onKeyDown={handleBarcodeKeyDown}
-            placeholder="BAG-XXXXXXXX"
-            autoFocus
-            readOnly={step === "preview" || step === "done"}
-          />
-          <p className="mt-1 text-center text-[11px] text-gray-400">
-            {step === "input" && "الصق الكود أو اكتبه ← اضغط Enter"}
-            {step === "preview" && "اضغط Enter أو زر التأكيد أدناه"}
-            {step === "done" && "اكتب أو الصق الكود التالي"}
+          <div className="flex items-center justify-between mb-1">
+            <label className="label-field mb-0">كود الباركود / QR</label>
+            {barcode && (
+              <button
+                type="button"
+                onClick={resetToScan}
+                className="text-xs text-red-600 hover:text-red-800 font-medium"
+              >
+                مسح الخانة ✕
+              </button>
+            )}
+          </div>
+          <div className="relative flex items-center">
+            <input
+              ref={inputRef}
+              className={`input-field text-center text-lg tracking-widest font-mono font-bold transition-all ${
+                step === "preview"
+                  ? "bg-emerald-50 border-emerald-500 text-emerald-900"
+                  : "text-gray-900"
+              }`}
+              dir="ltr"
+              value={barcode}
+              onChange={(e) => {
+                setBarcode(e.target.value);
+                // If user edits barcode after preview, reset to input step
+                if (step !== "input") {
+                  setStep("input");
+                  setPreview(null);
+                  setSubmitResult(null);
+                }
+              }}
+              onKeyDown={handleBarcodeKeyDown}
+              placeholder="BAG-XXXXXXXX"
+              autoFocus
+            />
+          </div>
+          <p className="mt-1 text-center text-[11px] text-gray-500">
+            {step === "input" && "امسح الكود بالكاميرا أو بحساس الباركود ← يظهر هنا مباشرة"}
+            {step === "preview" && "تم قراءة الكود وتجهيز البيانات للتأكيد"}
+            {step === "done" && "اكتب أو امسح الكود التالي"}
           </p>
         </div>
 
