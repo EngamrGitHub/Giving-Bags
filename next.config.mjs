@@ -19,6 +19,9 @@ const withPwaConfig = withPWA({
     {
       urlPattern: /^https?.*\/api\/.*$/,
       handler: "NetworkOnly",
+      options: {
+        cacheName: "api-network-only",
+      },
     },
     {
       urlPattern: /^https?.*/,
