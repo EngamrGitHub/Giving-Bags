@@ -24,23 +24,27 @@ export async function authenticateUser(identifier: string, password: string): Pr
   const cleanId = identifier.trim().toLowerCase();
 
   // 1. البحث في جدول المستخدمين في قاعدة البيانات
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [{ email: cleanId }, { username: cleanId }],
-    },
-  });
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: cleanId }, { username: cleanId }],
+      },
+    });
 
-  if (user) {
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (isMatch) {
-      return {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role as "ADMIN" | "STAFF",
-      };
+    if (user) {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (isMatch) {
+        return {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role as "ADMIN" | "STAFF",
+        };
+      }
+      return null;
     }
-    return null;
+  } catch (dbErr) {
+    console.warn("Database lookup failed, falling back to ENV credentials:", dbErr);
   }
 
   // 2. Fallback: التحقق مقابل بيانات ADMIN في ملف .env
