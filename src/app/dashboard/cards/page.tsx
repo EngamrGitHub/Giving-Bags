@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import BeneficiaryCard from "@/components/BeneficiaryCard";
 import PrintButton from "@/components/PrintButton";
 
+export const dynamic = "force-dynamic";
+
 export default async function CardsPage() {
   const beneficiaries = await prisma.beneficiary.findMany({
     where: { isActive: true },

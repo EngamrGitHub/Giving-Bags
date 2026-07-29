@@ -8,6 +8,8 @@ const ARABIC_MONTHS = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
 
+export const dynamic = "force-dynamic";
+
 export default async function BeneficiaryDetailPage({
   params,
 }: {

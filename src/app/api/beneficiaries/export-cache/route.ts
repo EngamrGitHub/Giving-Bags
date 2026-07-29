@@ -7,6 +7,8 @@ import { getSession } from "@/lib/auth";
  * لتحديث الكاش المحلي (IndexedDB) عشان صفحة "تسليم شنطة" و"المستفيدون"
  * تشتغل حتى لو النت اتقطع بعد كده.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -18,50 +20,55 @@ export async function GET(request: NextRequest) {
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
-  const beneficiaries = await prisma.beneficiary.findMany({
-    orderBy: { fullName: "asc" },
-    select: {
-      id: true,
-      fullName: true,
-      age: true,
-      nationalId: true,
-      phone: true,
-      address: true,
-      barcode: true,
-      isActive: true,
-      family: {
-        select: {
-          familyCode: true,
-          familyName: true,
+  try {
+    const beneficiaries = await prisma.beneficiary.findMany({
+      orderBy: { fullName: "asc" },
+      select: {
+        id: true,
+        fullName: true,
+        age: true,
+        nationalId: true,
+        phone: true,
+        address: true,
+        barcode: true,
+        isActive: true,
+        family: {
+          select: {
+            familyCode: true,
+            familyName: true,
+          },
+        },
+        redemptions: {
+          where: { month, year },
+          select: { id: true },
+          take: 1,
         },
       },
-      redemptions: {
-        where: { month, year },
-        select: { id: true },
-        take: 1,
-      },
-    },
-  });
+    });
 
-  const monthKey = `${year}-${month}`;
+    const monthKey = `${year}-${month}`;
 
-  return NextResponse.json({
-    monthKey,
-    items: beneficiaries.map((b) => ({
-      id: b.id,
-      fullName: b.fullName,
-      age: b.age,
-      nationalId: b.nationalId,
-      phone: b.phone,
-      address: b.address,
-      barcode: b.barcode,
-      isActive: b.isActive,
-      redeemedThisMonth: b.redemptions.length > 0,
-      redeemedMonthKey: monthKey,
-      family: b.family ? {
-        familyCode: b.family.familyCode,
-        familyName: b.family.familyName,
-      } : null,
-    })),
-  });
+    return NextResponse.json({
+      monthKey,
+      items: beneficiaries.map((b) => ({
+        id: b.id,
+        fullName: b.fullName,
+        age: b.age,
+        nationalId: b.nationalId,
+        phone: b.phone,
+        address: b.address,
+        barcode: b.barcode,
+        isActive: b.isActive,
+        redeemedThisMonth: b.redemptions.length > 0,
+        redeemedMonthKey: monthKey,
+        family: b.family ? {
+          familyCode: b.family.familyCode,
+          familyName: b.family.familyName,
+        } : null,
+      })),
+    });
+  } catch (err: any) {
+    console.warn("DB query in export-cache failed:", err);
+    return NextResponse.json({ monthKey: `${year}-${month}`, items: [], offline: true });
+  }
 }
