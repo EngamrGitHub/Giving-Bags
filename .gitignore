@@ -12,6 +12,7 @@ prisma/dev.db-journal
 # ملفات تتولد تلقائيًا وقت البناء (next-pwa & typescript)
 public/sw.js
 public/workbox-*.js
+public/fallback-*.js
 public/sw.js.map
 public/workbox-*.js.map
 tsconfig.tsbuildinfo

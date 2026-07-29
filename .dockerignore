@@ -8,3 +8,4 @@ build
 .git
 .gitignore
 tsconfig.tsbuildinfo
+public/fallback-*.js
