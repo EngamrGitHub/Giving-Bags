@@ -24,27 +24,23 @@ export async function authenticateUser(identifier: string, password: string): Pr
   const cleanId = identifier.trim().toLowerCase();
 
   // 1. البحث في جدول المستخدمين في قاعدة البيانات
-  try {
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: cleanId }, { username: cleanId }],
-      },
-    });
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: cleanId }, { username: cleanId }],
+    },
+  });
 
-    if (user) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (isMatch) {
-        return {
-          userId: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role as "ADMIN" | "STAFF",
-        };
-      }
-      return null;
+  if (user) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (isMatch) {
+      return {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role as "ADMIN" | "STAFF",
+      };
     }
-  } catch (dbErr) {
-    console.warn("Database lookup failed, falling back to ENV credentials:", dbErr);
+    return null;
   }
 
   // 2. Fallback: التحقق مقابل بيانات ADMIN في ملف .env
@@ -72,7 +68,7 @@ export async function createSession(userPayload: SessionPayload) {
 
   cookies().set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
     maxAge: SESSION_DURATION,
     path: "/",
