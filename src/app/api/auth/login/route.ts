@@ -8,26 +8,34 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const parsed = loginSchema.safeParse(body);
+  try {
+    const body = await request.json().catch(() => null);
+    const parsed = loginSchema.safeParse(body);
 
-  if (!parsed.success) {
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "من فضلك أدخل البريد الإلكتروني/اسم المستخدم وكلمة المرور" },
+        { status: 400 }
+      );
+    }
+
+    const { username, password } = parsed.data;
+
+    const sessionPayload = await authenticateUser(username, password);
+    if (!sessionPayload) {
+      return NextResponse.json(
+        { error: "البريد الإلكتروني/اسم المستخدم أو كلمة المرور غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    await createSession(sessionPayload);
+    return NextResponse.json({ success: true, user: sessionPayload });
+  } catch (err: any) {
+    console.error("Login API route error:", err);
     return NextResponse.json(
-      { error: "من فضلك أدخل البريد الإلكتروني/اسم المستخدم وكلمة المرور" },
-      { status: 400 }
+      { error: `خطأ في سيرفر الجلسات: ${err?.message || String(err)}` },
+      { status: 500 }
     );
   }
-
-  const { username, password } = parsed.data;
-
-  const sessionPayload = await authenticateUser(username, password);
-  if (!sessionPayload) {
-    return NextResponse.json(
-      { error: "البريد الإلكتروني/اسم المستخدم أو كلمة المرور غير صحيحة" },
-      { status: 401 }
-    );
-  }
-
-  await createSession(sessionPayload);
-  return NextResponse.json({ success: true, user: sessionPayload });
 }
