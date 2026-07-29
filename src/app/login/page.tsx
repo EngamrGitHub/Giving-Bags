@@ -22,10 +22,10 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json().catch(() => null);
+      const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data?.error || `تعذر تسجيل الدخول (رمز الخطأ: ${res.status})`);
+        toast.error(data.error || "حدث خطأ أثناء تسجيل الدخول");
         return;
       }
 
@@ -33,7 +33,7 @@ function LoginForm() {
       router.push(next);
       router.refresh();
     } catch {
-      toast.error("تعذر الاتصال بالخادم، تحقق من الاتصال بالشبكة");
+      toast.error("تعذر الاتصال بالخادم");
     } finally {
       setLoading(false);
     }
